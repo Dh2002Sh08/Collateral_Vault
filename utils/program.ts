@@ -373,6 +373,36 @@ export const IDL: Idl = {
                     "index": false
                 }
             ]
+        },
+        {
+            "name": "InitializeVaultEvent",
+            "fields": [
+                {
+                    "name": "vault",
+                    "type": "publicKey",
+                    "index": false
+                },
+                {
+                    "name": "owner",
+                    "type": "publicKey",
+                    "index": false
+                },
+                {
+                    "name": "tokenMint",
+                    "type": "publicKey",
+                    "index": false
+                },
+                {
+                    "name": "vaultTokenAccount",
+                    "type": "publicKey",
+                    "index": false
+                },
+                {
+                    "name": "timestamp",
+                    "type": "i64",
+                    "index": false
+                }
+            ]
         }
     ],
     "errors": [

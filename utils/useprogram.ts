@@ -2,23 +2,16 @@ import { Program, AnchorProvider, BN } from '@project-serum/anchor'
 import { SystemProgram, PublicKey, Transaction, ComputeBudgetProgram } from '@solana/web3.js'
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, getMint } from '@solana/spl-token'
 import { programId, IDL } from './program'
-// import { get } from 'http';
 
 
 export const PROGRAM_ID = new PublicKey(programId);
 
 
-// J19wcaqRjZ91C72iLJ8g5ZwtbPwMkgiF8Pu43h2RTA5p
 
 export function getProgram(provider: AnchorProvider) {
   return new Program(IDL, PROGRAM_ID, provider)
 }
 
-// ============ Collateral Vault Functions ============
-
-/**
- * Get the vault PDA for a user
- */
 export function getVaultPDA(user: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from('vault_v1'), user.toBuffer()],
@@ -26,9 +19,7 @@ export function getVaultPDA(user: PublicKey): [PublicKey, number] {
   );
 }
 
-/**
- * Initialize a new collateral vault
- */
+
 export async function initializeVault(
   provider: AnchorProvider,
   user: PublicKey,
@@ -40,22 +31,19 @@ export async function initializeVault(
   const [vaultPda] = getVaultPDA(user);
   console.log("Vault PDA:", vaultPda.toBase58());
 
-  // Get associated token account for the vault
   const vaultTokenAccount = await getAssociatedTokenAddress(
     tokenMint,
     vaultPda,
-    true // allowOwnerOffCurve for PDA
+    true 
   );
 
   const transaction = new Transaction();
 
-  // Add priority fee
   const priorityFeeInstruction = ComputeBudgetProgram.setComputeUnitPrice({
     microLamports: 10000,
   });
   transaction.add(priorityFeeInstruction);
 
-  // Add initializeVault instruction
   const instruction = await program.methods
     .initializeVault()
     .accounts({
@@ -70,7 +58,6 @@ export async function initializeVault(
     .instruction();
   transaction.add(instruction);
 
-  // Set recent blockhash and fee payer
   const { blockhash } = await connection.getLatestBlockhash('finalized');
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = user;
@@ -81,7 +68,6 @@ export async function initializeVault(
       commitment: 'confirmed',
     });
 
-    // Verify transaction
     const confirmation = await connection.getSignatureStatus(signature);
     if (confirmation?.value?.err) {
       console.error('InitializeVault transaction failed:', confirmation.value.err);
@@ -97,57 +83,45 @@ export async function initializeVault(
   }
 }
 
-/**
- * Convert human-readable token amount to base units (smallest unit)
- */
 function convertToBaseUnits(amount: string | number, decimals: number): BN {
   const amountStr = typeof amount === 'number' ? amount.toString() : amount;
   const [integerPart, decimalPart = ''] = amountStr.split('.');
 
-  // Pad or truncate decimal part to match decimals
   const paddedDecimal = decimalPart.padEnd(decimals, '0').slice(0, decimals);
 
-  // Combine integer and decimal parts
   const baseUnits = integerPart + paddedDecimal;
 
   return new BN(baseUnits);
 }
 
-/**
- * Deposit tokens into the vault
- */
+
 export async function deposit(
   provider: AnchorProvider,
   user: PublicKey,
   tokenMint: PublicKey,
-  amount: string | number, // Human-readable amount (e.g., "1.5" for 1.5 tokens)
+  amount: string | number, 
 ) {
   const program = getProgram(provider);
   const connection = provider.connection;
 
-  // Get token decimals from mint
   const mintInfo = await getMint(connection, tokenMint);
   const decimals = mintInfo.decimals;
 
-  // Convert human-readable amount to base units
   const amountInBaseUnits = convertToBaseUnits(amount, decimals);
 
   const [vaultPda] = getVaultPDA(user);
 
-  // Get user's token account
   const userTokenAccount = await getAssociatedTokenAddress(
     tokenMint,
     user
   );
 
-  // Get vault's token account
   const vaultTokenAccount = await getAssociatedTokenAddress(
     tokenMint,
     vaultPda,
-    true // allowOwnerOffCurve for PDA
+    true 
   );
 
-  // Check if vault exists, if not initialize it
   const vaultInfo = await connection.getAccountInfo(vaultPda);
   if (!vaultInfo) {
     await initializeVault(provider, user, tokenMint);
@@ -155,25 +129,22 @@ export async function deposit(
 
   const transaction = new Transaction();
 
-  // Add priority fee
   const priorityFeeInstruction = ComputeBudgetProgram.setComputeUnitPrice({
     microLamports: 10000,
   })
   transaction.add(priorityFeeInstruction);
 
-  // Check if user's token account exists, if not create it
   const userTokenAccountInfo = await connection.getAccountInfo(userTokenAccount);
   if (!userTokenAccountInfo) {
     const createATAInstruction = createAssociatedTokenAccountInstruction(
-      user, // payer
-      userTokenAccount, // ata
-      user, // owner
-      tokenMint // mint
+      user,   
+      userTokenAccount, 
+      user, 
+      tokenMint 
     );
     transaction.add(createATAInstruction);
   }
 
-  // Add deposit instruction
   const instruction = await program.methods
     .deposit(amountInBaseUnits)
     .accounts({
@@ -186,7 +157,6 @@ export async function deposit(
     .instruction();
   transaction.add(instruction);
 
-  // Set recent blockhash and fee payer
   const { blockhash } = await connection.getLatestBlockhash('finalized');
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = user;
@@ -197,7 +167,6 @@ export async function deposit(
       commitment: 'confirmed',
     });
 
-    // Verify transaction
     const confirmation = await connection.getSignatureStatus(signature);
     if (confirmation?.value?.err) {
       console.error('Deposit transaction failed:', confirmation.value.err);
@@ -213,53 +182,46 @@ export async function deposit(
   }
 }
 
-/**
- * Withdraw tokens from the vault
- */
+
 export async function withdraw(
   provider: AnchorProvider,
   user: PublicKey,
   tokenMint: PublicKey,
-  amount: string | number, // Human-readable amount (e.g., "1.5" for 1.5 tokens)
+  amount: string | number, 
 ) {
   const program = getProgram(provider);
   const connection = provider.connection;
 
-  // Get token decimals from mint
   const mintInfo = await getMint(connection, tokenMint);
   const decimals = mintInfo.decimals;
-
-  // Convert human-readable amount to base units
   const amountInBaseUnits = convertToBaseUnits(amount, decimals);
 
   const [vaultPda] = getVaultPDA(user);
 
-  // Fetch vault to get owner
   const vaultAccount = await program.account.collateralVault.fetch(vaultPda);
   const owner = vaultAccount.owner;
 
-  // Get user's token account
+
   const userTokenAccount = await getAssociatedTokenAddress(
     tokenMint,
     user
   );
 
-  // Get vault's token account
   const vaultTokenAccount = await getAssociatedTokenAddress(
     tokenMint,
     vaultPda,
-    true // allowOwnerOffCurve for PDA
+    true 
   );
 
   const transaction = new Transaction();
 
-  // Add priority fee
+
   const priorityFeeInstruction = ComputeBudgetProgram.setComputeUnitPrice({
     microLamports: 10000,
   });
   transaction.add(priorityFeeInstruction);
 
-  // Add withdraw instruction
+
   const instruction = await program.methods
     .withdraw(amountInBaseUnits)
     .accounts({
@@ -273,7 +235,7 @@ export async function withdraw(
     .instruction();
   transaction.add(instruction);
 
-  // Set recent blockhash and fee payer
+
   const { blockhash } = await connection.getLatestBlockhash('finalized');
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = user;
@@ -284,7 +246,6 @@ export async function withdraw(
       commitment: 'confirmed',
     });
 
-    // Verify transaction
     const confirmation = await connection.getSignatureStatus(signature);
     if (confirmation?.value?.err) {
       console.error('Withdraw transaction failed:', confirmation.value.err);
@@ -300,9 +261,7 @@ export async function withdraw(
   }
 }
 
-/**
- * Lock collateral in the vault
- */
+
 export async function lockCollateral(
   provider: AnchorProvider,
   user: PublicKey,
@@ -315,13 +274,12 @@ export async function lockCollateral(
 
   const transaction = new Transaction();
 
-  // Add priority fee
   const priorityFeeInstruction = ComputeBudgetProgram.setComputeUnitPrice({
     microLamports: 10000,
   });
   transaction.add(priorityFeeInstruction);
 
-  // Add lockCollateral instruction
+
   const instruction = await program.methods
     .lockCollateral(amount)
     .accounts({
@@ -330,7 +288,7 @@ export async function lockCollateral(
     .instruction();
   transaction.add(instruction);
 
-  // Set recent blockhash and fee payer
+
   const { blockhash } = await connection.getLatestBlockhash('finalized');
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = user;
@@ -341,7 +299,7 @@ export async function lockCollateral(
       commitment: 'confirmed',
     });
 
-    // Verify transaction
+
     const confirmation = await connection.getSignatureStatus(signature);
     if (confirmation?.value?.err) {
       console.error('LockCollateral transaction failed:', confirmation.value.err);
@@ -357,9 +315,6 @@ export async function lockCollateral(
   }
 }
 
-/**
- * Unlock collateral in the vault
- */
 export async function unlockCollateral(
   provider: AnchorProvider,
   user: PublicKey,
@@ -372,13 +327,13 @@ export async function unlockCollateral(
 
   const transaction = new Transaction();
 
-  // Add priority fee
+
   const priorityFeeInstruction = ComputeBudgetProgram.setComputeUnitPrice({
     microLamports: 10000,
   });
   transaction.add(priorityFeeInstruction);
 
-  // Add unlockCollateral instruction
+
   const instruction = await program.methods
     .unlockCollateral(amount)
     .accounts({
@@ -387,7 +342,7 @@ export async function unlockCollateral(
     .instruction();
   transaction.add(instruction);
 
-  // Set recent blockhash and fee payer
+
   const { blockhash } = await connection.getLatestBlockhash('finalized');
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = user;
@@ -398,7 +353,6 @@ export async function unlockCollateral(
       commitment: 'confirmed',
     });
 
-    // Verify transaction
     const confirmation = await connection.getSignatureStatus(signature);
     if (confirmation?.value?.err) {
       console.error('UnlockCollateral transaction failed:', confirmation.value.err);
@@ -414,9 +368,6 @@ export async function unlockCollateral(
   }
 }
 
-/**
- * Transfer collateral between vaults - auto-initializes recipient vault if missing
- */
 export async function transferCollateral(
   provider: AnchorProvider,
   fromUser: PublicKey,
@@ -426,14 +377,10 @@ export async function transferCollateral(
   const program = getProgram(provider);
   const connection = provider.connection;
 
-  // ⚠️ SAFETY CHECK
   if (!provider.wallet.publicKey.equals(fromUser)) {
     throw new Error("fromUser must be the connected wallet (payer & signer)");
   }
 
-  // ────────────────────────────────────────────────
-  // PDA DERIVATION (MUST MATCH PROGRAM)
-  // ────────────────────────────────────────────────
   const [fromVaultPda] = PublicKey.findProgramAddressSync(
     [Buffer.from("vault_v1"), fromUser.toBuffer()],
     PROGRAM_ID
@@ -451,14 +398,8 @@ export async function transferCollateral(
   console.log("To vault PDA:", toVaultPda.toBase58());
   console.log("Amount:", amount.toString());
 
-  // ────────────────────────────────────────────────
-  // ❌ DO NOT CHECK / INIT RECIPIENT VAULT
-  // Anchor will auto-create via init_if_needed
-  // ────────────────────────────────────────────────
-
   const tx = new Transaction();
 
-  // Priority fee (optional but good)
   tx.add(
     ComputeBudgetProgram.setComputeUnitPrice({
       microLamports: 25_000,
@@ -468,10 +409,10 @@ export async function transferCollateral(
   const transferIx = await program.methods
     .transferCollateral(amount)
     .accounts({
-      fromOwner: fromUser,        // signer
-      toOwner: toUser,            // recipient
+      fromOwner: fromUser,       
+      toOwner: toUser,            
       fromVault: fromVaultPda,
-      toVault: toVaultPda,        // auto-init happens HERE
+      toVault: toVaultPda,      
       systemProgram: SystemProgram.programId,
     })
     .instruction();
@@ -506,10 +447,6 @@ export async function transferCollateral(
 }
 
 
-
-
-
-
 /**
  * Fetch vault data
  */
@@ -519,28 +456,43 @@ export async function fetchVault(
 ) {
   try {
     const program = getProgram(provider);
-
     const [vaultPda] = getVaultPDA(user);
 
-    const vaultAccount = await program.account.collateralVault.fetchNullable(vaultPda);
+    const vaultAccount =
+      await program.account.collateralVault.fetchNullable(vaultPda);
 
     if (!vaultAccount) {
       return null;
     }
 
+    const mintInfo = await getMint(
+      provider.connection,
+      vaultAccount.usdtMint
+    );
+
+    const decimals = mintInfo.decimals;
+    const divisor = Math.pow(10, decimals);
+
+    const normalize = (value: any) =>
+      Number(value.toString()) / divisor;
+
     return {
-      owner: vaultAccount.owner.toString(),
-      tokenAccount: vaultAccount.tokenAccount.toString(),
-      totalBalance: vaultAccount.totalBalance.toString(),
-      lockedBalance: vaultAccount.lockedBalance.toString(),
-      availableBalance: vaultAccount.availableBalance.toString(),
-      totalDeposited: vaultAccount.totalDeposited.toString(),
-      totalWithdrawn: vaultAccount.totalWithdrawn.toString(),
+      owner: vaultAccount.owner.toBase58(),
+      tokenMint: vaultAccount.usdtMint.toBase58(),
+      tokenDecimals: decimals,
+      tokenAccount: vaultAccount.tokenAccount.toBase58(),
+
+      totalBalance: normalize(vaultAccount.totalBalance),
+      lockedBalance: normalize(vaultAccount.lockedBalance),
+      availableBalance: normalize(vaultAccount.availableBalance),
+      totalDeposited: normalize(vaultAccount.totalDeposited),
+      totalWithdrawn: normalize(vaultAccount.totalWithdrawn),
+
       createdAt: vaultAccount.createdAt.toNumber(),
       bump: vaultAccount.bump,
     };
   } catch (err) {
-    console.error('Error fetching vault:', err);
+    console.error("Error fetching vault:", err);
     return null;
   }
 }
