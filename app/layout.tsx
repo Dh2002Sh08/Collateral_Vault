@@ -2,8 +2,8 @@ import './globals.css';
 import { SolanaWalletProvider } from "@/components/WalletProvider";
 
 export const metadata = {
-  title: 'DeChat',
-  description: 'A decentralized application for Chatting',
+  title: 'Collateral Vault',
+  description: 'A decentralized application for Collateral Vault',
 };
 
 export default function RootLayout({
