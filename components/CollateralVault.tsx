@@ -218,7 +218,15 @@ export default function CollateralVault() {
     try {
       setLoading(true);
       setError(null);
-      const amount = new BN(lockAmount);
+      
+      // Convert human-readable amount to base units
+      const decimals = vaultData?.tokenDecimals || 9; // Default to 9 if not available
+      const amountStr = lockAmount.toString();
+      const [integerPart, decimalPart = ''] = amountStr.split('.');
+      const paddedDecimal = decimalPart.padEnd(decimals, '0').slice(0, decimals);
+      const baseUnits = integerPart + paddedDecimal;
+      const amount = new BN(baseUnits);
+      
       const signature = await lockCollateral(provider, wallet.publicKey, amount);
       setLastTx(signature);
       showSuccess(`Collateral locked! Transaction: ${signature}`);
@@ -238,7 +246,15 @@ export default function CollateralVault() {
     try {
       setLoading(true);
       setError(null);
-      const amount = new BN(unlockAmount);
+      
+      // Convert human-readable amount to base units
+      const decimals = vaultData?.tokenDecimals || 9; // Default to 9 if not available
+      const amountStr = unlockAmount.toString();
+      const [integerPart, decimalPart = ''] = amountStr.split('.');
+      const paddedDecimal = decimalPart.padEnd(decimals, '0').slice(0, decimals);
+      const baseUnits = integerPart + paddedDecimal;
+      const amount = new BN(baseUnits);
+      
       const signature = await unlockCollateral(provider, wallet.publicKey, amount);
       setLastTx(signature);
       showSuccess(`Collateral unlocked! Transaction: ${signature}`);
@@ -268,7 +284,13 @@ export default function CollateralVault() {
         return;
       }
 
-      const amount = new BN(transferAmount);
+      // Convert human-readable amount to base units
+      const decimals = vaultData?.tokenDecimals || 9; // Default to 9 if not available
+      const amountStr = transferAmount.toString();
+      const [integerPart, decimalPart = ''] = amountStr.split('.');
+      const paddedDecimal = decimalPart.padEnd(decimals, '0').slice(0, decimals);
+      const baseUnits = integerPart + paddedDecimal;
+      const amount = new BN(baseUnits);
   
       const signature = await transferCollateral(
         provider,
